@@ -6,7 +6,7 @@ license instead of rebuilding.
 
 ## What's inside
 
-- **MCP server** (`servers/amos-mcp.mjs`, self-contained bundle): 14 tools — search,
+- **MCP server** (`servers/amos-mcp.mjs`, self-contained bundle): 17 tools — search,
   inspect, compare, plan_solution, quote, policy-governed purchase, entitlements,
   invocation, updates, and `export_customization_context`.
 - **Skill** `search-before-build`: fires on build-shaped requests; searches first, does an
