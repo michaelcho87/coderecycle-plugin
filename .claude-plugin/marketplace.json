@@ -1,0 +1,11 @@
+{
+  "name": "ai-marketplace-os",
+  "owner": { "name": "AI Marketplace OS", "url": "https://aimarketplaceos.com" },
+  "plugins": [
+    {
+      "name": "ai-marketplace-os",
+      "source": ".",
+      "description": "Search the marketplace before building from scratch; buy and customize under machine-readable licenses. MCP server + search-before-build skill + optional prompt hook."
+    }
+  ]
+}

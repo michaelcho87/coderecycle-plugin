@@ -1,0 +1,6 @@
+{
+  "name": "ai-marketplace-os",
+  "version": "0.1.0",
+  "description": "Search AI Marketplace OS before building from scratch: find, buy, and customize existing software instead of re-plumbing it. Includes the marketplace MCP server, a search-before-build skill, and an optional prompt hook.",
+  "author": { "name": "AI Marketplace OS" }
+}
