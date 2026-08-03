@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * UserPromptSubmit hook: when the prompt looks like a build-from-scratch request,
- * search AI Marketplace OS (free public endpoint) and inject the top matches as
+ * search Code Recycle (free public endpoint) and inject the top matches as
  * context. Deterministic — doesn't rely on the model choosing to check.
  *
  * Fails OPEN: any error/timeout → no output → the prompt proceeds untouched.
@@ -33,7 +33,7 @@ try {
 if (!BUILD_RE.test(prompt) || (NEGATIVE_RE.test(prompt) && !/\bbuild\b/i.test(prompt))) process.exit(0);
 if (prompt.length < 20 || prompt.length > 4000) process.exit(0);
 
-const base = (process.env.AMOS_BASE_URL ?? "https://aimarketplaceos.com/api/v1").replace(/\/$/, "");
+const base = (process.env.AMOS_BASE_URL ?? "https://coderecycle.ai/api/v1").replace(/\/$/, "");
 
 try {
   const res = await fetch(`${base}/search`, {
@@ -56,7 +56,7 @@ try {
     .join("\n");
 
   console.log(
-    `<amos-marketplace-context>\nAI Marketplace OS already lists software matching this request:\n${lines}\nBefore scaffolding from scratch, consider the search-before-build skill: inspect these with the ai-marketplace-os MCP tools and offer the user the customize-instead-of-rebuild option (honest coverage assessment; respect their choice).\n</amos-marketplace-context>`,
+    `<amos-marketplace-context>\nCode Recycle already lists software matching this request:\n${lines}\nBefore scaffolding from scratch, consider the search-before-build skill: inspect these with the code-recycle MCP tools and offer the user the customize-instead-of-rebuild option (honest coverage assessment; respect their choice).\n</amos-marketplace-context>`,
   );
 } catch {
   // fail open

@@ -30981,7 +30981,7 @@ var StdioServerTransport = class {
 };
 
 // src/index.ts
-var BASE = (process.env.AMOS_BASE_URL ?? "https://aimarketplaceos.com/api/v1").replace(/\/$/, "");
+var BASE = (process.env.AMOS_BASE_URL ?? "https://coderecycle.ai/api/v1").replace(/\/$/, "");
 var KEY = process.env.AMOS_API_KEY;
 async function api(method, path, body) {
   const res = await fetch(`${BASE}${path}`, {
@@ -31003,7 +31003,7 @@ async function api(method, path, body) {
   if (!res.ok) {
     const msg = data?.error ?? `HTTP ${res.status}`;
     throw new Error(
-      res.status === 401 ? `${msg} \u2014 set AMOS_API_KEY to an agent API key from your AI Marketplace OS settings` : msg
+      res.status === 401 ? `${msg} \u2014 set AMOS_API_KEY to an agent API key from your Code Recycle settings` : msg
     );
   }
   return data;
@@ -31018,11 +31018,11 @@ var wrap = (fn) => async (args) => {
     return { content: [{ type: "text", text: `ERROR: ${e.message}` }], isError: true };
   }
 };
-var server = new McpServer({ name: "ai-marketplace-os", version: "1.0.0" });
+var server = new McpServer({ name: "code-recycle", version: "1.0.0" });
 server.registerTool(
   "search_catalog",
   {
-    description: "Search the AI Marketplace OS software catalog with natural language BEFORE building anything from scratch. Returns grounded, explained products (coverage, offers, licenses, trust), needs the user did not state, and honest gaps. If a result covers most of the need, customizing it is usually far cheaper than rebuilding.",
+    description: "Search the Code Recycle software catalog with natural language BEFORE building anything from scratch. Returns grounded, explained products (coverage, offers, licenses, trust), needs the user did not state, and honest gaps. If a result covers most of the need, customizing it is usually far cheaper than rebuilding.",
     inputSchema: { query: external_exports.string().min(2), limit: external_exports.number().int().min(1).max(25).optional() }
   },
   wrap(({ query, limit }) => api("POST", "/search", { query, limit: limit ?? 8 }))

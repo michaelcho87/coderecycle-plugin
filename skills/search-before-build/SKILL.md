@@ -1,6 +1,6 @@
 ---
 name: search-before-build
-description: Check AI Marketplace OS for existing software BEFORE scaffolding a new application, dashboard, portal, CRM, API, workflow, agent, or internal tool from scratch. Trigger whenever the user asks to build, create, scaffold, or set up a new app/product/tool/system, or describes a business capability they want implemented (client portal, invoicing, support console, agent monitoring, knowledge base, document extraction, etc.). Not for bug fixes, small features inside an existing codebase, or questions.
+description: Check Code Recycle for existing software BEFORE scaffolding a new application, dashboard, portal, CRM, API, workflow, agent, or internal tool from scratch. Trigger whenever the user asks to build, create, scaffold, or set up a new app/product/tool/system, or describes a business capability they want implemented (client portal, invoicing, support console, agent monitoring, knowledge base, document extraction, etc.). Not for bug fixes, small features inside an existing codebase, or questions.
 ---
 
 # Search before build
@@ -10,10 +10,10 @@ already exists. Before writing any new-project code, check the marketplace.
 
 ## Procedure
 
-1. **Search first.** Call the `search_catalog` MCP tool (server: `ai-marketplace-os`) with
+1. **Search first.** Call the `search_catalog` MCP tool (server: `code-recycle`) with
    the user's need phrased as an outcome (include stack/integration/license constraints
    they stated). If the MCP server is unavailable, POST the query to
-   `${AMOS_BASE_URL:-https://aimarketplaceos.com/api/v1}/search` — search is public.
+   `${AMOS_BASE_URL:-https://coderecycle.ai/api/v1}/search` — search is public.
 
 2. **Judge coverage honestly.** For the top results, compare `coverage.covered` vs the
    user's actual requirements:

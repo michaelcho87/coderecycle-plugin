@@ -1,10 +1,10 @@
 {
   "mcpServers": {
-    "ai-marketplace-os": {
+    "code-recycle": {
       "command": "node",
       "args": ["${CLAUDE_PLUGIN_ROOT}/servers/amos-mcp.mjs"],
       "env": {
-        "AMOS_BASE_URL": "${AMOS_BASE_URL:-https://aimarketplaceos.com/api/v1}",
+        "AMOS_BASE_URL": "${AMOS_BASE_URL:-https://coderecycle.ai/api/v1}",
         "AMOS_API_KEY": "${AMOS_API_KEY:-}"
       }
     }
