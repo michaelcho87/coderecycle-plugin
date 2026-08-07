@@ -10,6 +10,18 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "TodoWrite|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/plan-aware-match.mjs\"",
+            "timeout": 5
+          }
+        ]
+      }
     ]
   }
 }

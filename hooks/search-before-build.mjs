@@ -1,14 +1,69 @@
 #!/usr/bin/env node
 /**
- * UserPromptSubmit hook: when the prompt looks like a build-from-scratch request,
- * search Code Recycle (free public endpoint) and inject the top matches as
- * context. Deterministic — doesn't rely on the model choosing to check.
+ * UserPromptSubmit hook: when a prompt looks like build-from-scratch, check whether
+ * Code Recycle already lists the thing — and, crucially, whether BUYING IS ACTUALLY
+ * BETTER than building it. If the arithmetic says keep building, this stays silent.
  *
- * Fails OPEN: any error/timeout → no output → the prompt proceeds untouched.
+ * That silence is the feature. A hook that surfaces a listing on every name match is an
+ * advertisement, and a developer mutes an advertisement after two firings. This one only
+ * speaks when it can show its working — which is also the only version that survives a
+ * user who checks the numbers.
+ *
+ * CONFIGURE IT — the thresholds are the user's, not ours. Put JSON at
+ * ~/.config/code-recycle/hook.json (or point CODE_RECYCLE_CONFIG at a file):
+ *
+ *   {
+ *     "maxPriceCents": 5000,        // never surface anything dearer than this
+ *     "billing": "capped",          // "flat" | "capped" | "api" — how YOU pay for tokens
+ *     "minAttempts": 3,             // ignore anything an agent nails in fewer tries
+ *     "onlySilentFailures": false,  // true = only things that break quietly
+ *     "onlyPlateaus": false,        // true = only things more effort does NOT fix
+ *     "enabled": true
+ *   }
+ *
+ * `billing` decides which comparison is honest for you:
+ *   flat   — under a flat-rate cap. Tokens cost nothing at the margin, so NO dollar claim
+ *            is made. The cost is attempts and attention.
+ *   capped — you hit weekly/5-hour limits. Prompts get blocked, quota cannot be bought,
+ *            and there is no override — so your fallback is API billing and dollars are real.
+ *   api    — you pay per token throughout.
+ *
+ * Fails OPEN: any error, timeout, or unreadable config → no output → prompt untouched.
  */
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+
 const BUILD_RE =
-  /\b(build|create|scaffold|set ?up|make|develop|spin up|start)\b[\s\S]{0,80}\b(app|application|dashboard|portal|crm|saas|website|platform|api|tool|system|console|tracker|workflow|automation|agent|bot|marketplace|wiki|knowledge base|pipeline)\b/i;
+  /\b(build|create|scaffold|set ?up|make|develop|spin up|start|implement|write)\b[\s\S]{0,80}\b(app|application|dashboard|portal|crm|saas|website|platform|api|tool|system|console|tracker|workflow|automation|agent|bot|marketplace|wiki|knowledge base|pipeline|parser|resolver|scheduler|component|ui)\b/i;
 const NEGATIVE_RE = /\b(fix|debug|refactor|rename|test|deploy|commit|review|explain|why|error)\b/i;
+
+const DEFAULTS = {
+  enabled: true,
+  maxPriceCents: 10_000,
+  billing: "flat",
+  minAttempts: 2,
+  onlySilentFailures: false,
+  onlyPlateaus: false,
+};
+
+function loadConfig() {
+  const paths = [
+    process.env.CODE_RECYCLE_CONFIG,
+    join(homedir(), ".config", "code-recycle", "hook.json"),
+  ].filter(Boolean);
+  for (const p of paths) {
+    try {
+      return { ...DEFAULTS, ...JSON.parse(readFileSync(p, "utf8")) };
+    } catch {
+      /* try the next path */
+    }
+  }
+  return DEFAULTS;
+}
+
+const cfg = loadConfig();
+if (!cfg.enabled) process.exit(0);
 
 let input = "";
 try {
@@ -34,29 +89,73 @@ if (!BUILD_RE.test(prompt) || (NEGATIVE_RE.test(prompt) && !/\bbuild\b/i.test(pr
 if (prompt.length < 20 || prompt.length > 4000) process.exit(0);
 
 const base = (process.env.AMOS_BASE_URL ?? "https://coderecycle.ai/api/v1").replace(/\/$/, "");
+const usd = (c) => `$${(c / 100).toFixed(c % 100 === 0 ? 0 : 2)}`;
 
 try {
   const res = await fetch(`${base}/search`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ query: prompt.slice(0, 1500), limit: 3 }),
+    body: JSON.stringify({ query: prompt.slice(0, 1500), limit: 5 }),
     signal: AbortSignal.timeout(8000),
   });
   if (!res.ok) process.exit(0);
   const data = await res.json();
-  const results = (data.results ?? []).filter((r) => (r.coverage?.covered?.length ?? 0) > 0 || r.score > 0.02);
-  if (results.length === 0) process.exit(0);
 
-  const lines = results
-    .slice(0, 3)
-    .map(
-      (r) =>
-        `- ${r.name}${r.isDemo ? " [DEMO]" : ""} (${r.slug}): ${r.whyItMatches?.[0] ?? r.summary?.slice(0, 100)}${r.priceFromCents != null ? ` — from $${(r.priceFromCents / 100).toFixed(0)}` : ""}`,
-    )
-    .join("\n");
+  const worth = (data.results ?? []).filter((r) => {
+    if ((r.coverage?.covered?.length ?? 0) === 0 && (r.score ?? 0) <= 0.02) return false;
+
+    const price = r.priceFromCents;
+    // Free listings are always worth mentioning: nothing is being sold.
+    if (price == null || price === 0) return true;
+    if (price > cfg.maxPriceCents) return false;
+
+    const e = r.economics;
+    // No measured estimate means no basis for a recommendation. Stay quiet rather than
+    // guess — an unmeasured listing is exactly where a hook would start bluffing.
+    if (!e) return false;
+    if (e.recommendation === "generate_it_yourself") return false;
+    if (e.attempts < cfg.minAttempts) return false;
+    if (cfg.onlySilentFailures && e.failureMode !== "silent") return false;
+    if (cfg.onlyPlateaus && !e.plateaus) return false;
+
+    // The decisive test, and it argues against us often: when the user pays real money
+    // per token, a listing that costs more than rebuilding it is not worth surfacing.
+    if (cfg.billing === "api" || cfg.billing === "capped") {
+      if (e.rebuildFeesCents < price) return false;
+    }
+    return true;
+  });
+
+  if (worth.length === 0) process.exit(0);
+
+  const lines = worth.slice(0, 3).map((r) => {
+    const e = r.economics;
+    const price = r.priceFromCents == null || r.priceFromCents === 0 ? "free" : usd(r.priceFromCents);
+    const why = e
+      ? ` — measured rebuild ~${e.attempts} attempts` +
+        (e.failureMode === "silent" ? ", fails silently" : "") +
+        (e.plateaus ? ", and more attempts do not converge on it" : "") +
+        (cfg.billing !== "flat" ? `; ~${usd(e.rebuildFeesCents)} of model fees to redo` : "")
+      : "";
+    return `- ${r.name} (${r.slug}): ${price}${why}`;
+  });
+
+  const billingNote =
+    cfg.billing === "flat"
+      ? "This user is on a flat-rate plan: the cost to them is attempts and attention, NOT dollars. Do not claim buying saves them money."
+      : cfg.billing === "capped"
+        ? "This user hits usage caps. When blocked, quota cannot be bought and there is no override, so their fallback is API billing — the dollar comparison above is real for them."
+        : "This user pays per token, so the dollar comparison above is real.";
 
   console.log(
-    `<amos-marketplace-context>\nCode Recycle already lists software matching this request:\n${lines}\nBefore scaffolding from scratch, consider the search-before-build skill: inspect these with the code-recycle MCP tools and offer the user the customize-instead-of-rebuild option (honest coverage assessment; respect their choice).\n</amos-marketplace-context>`,
+    `<code-recycle-context>\n` +
+      `Existing software matches this request, and the arithmetic favours buying:\n` +
+      `${lines.join("\n")}\n\n` +
+      `${billingNote}\n` +
+      `Filtered by this user's own thresholds (max ${usd(cfg.maxPriceCents)}, at least ${cfg.minAttempts} attempts). ` +
+      `Listings where rebuilding would be cheaper were already excluded before you saw this.\n` +
+      `Say what these do NOT cover before recommending one, and respect a decision to build anyway.\n` +
+      `</code-recycle-context>`,
   );
 } catch {
   // fail open
