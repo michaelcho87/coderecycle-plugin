@@ -195,11 +195,27 @@ const line = (r) => {
   Additional context, never a block. `decision: "block"` exists in this hook API and using it
   here would be indefensible: nobody has agreed that a marketplace may stop their editor.
 */
+/*
+  DO NOT PROMISE THAT inspect_product WILL WORK.
+
+  This used to end "Call inspect_product for detail" unconditionally. That is a dead end
+  whenever the store is unreachable — and it is unreachable right now: coderecycle.ai returns
+  503 "temporarily closed while we build" for both /api/v1/search and /api/v1/products/*. So
+  the hook surfaced a product, sent the agent to fetch detail, and the agent spent a tool call
+  to receive an error it could not act on.
+
+  The wording below is true in every state instead of being true only after the store opens,
+  because a hook that hardcodes "the store is closed" goes stale the day it opens and starts
+  lying in the other direction. The local match already carries what is needed to decide
+  whether to care: name, one line, and a price band.
+*/
 const body =
   `Code Recycle already lists ${fresh.length === 1 ? "something" : "things"} for this:\n` +
   fresh.map(line).join("\n") +
   `\n\nMatched locally against a shipped index — no search was run and nothing was spent. ` +
-  `Call inspect_product for detail, or ignore this. Not shown again this session.`;
+  `inspect_product returns full detail IF the store is reachable; it is in limited preview and ` +
+  `may refuse. Either way this is a suggestion, not a blocker — ignore it and carry on. ` +
+  `Not shown again this session.`;
 
 process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "PreToolUse", additionalContext: body } }));
 process.exit(0);
