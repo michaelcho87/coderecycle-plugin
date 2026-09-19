@@ -31022,6 +31022,11 @@ function createCodeRecycleServer(opts = {}) {
   const withPrice = (name, description) => {
     const cents = opts.prices?.[name];
     if (!cents || cents <= 0) return description;
+    if (!opts.meter) {
+      return `${description}
+
+Free on this connection: no API key, so there is no balance to charge. With an API key this tool costs ${cents}\xA2 per call.`;
+    }
     return `${description}
 
 Cost: ${cents}\xA2 per call, charged to your organization's credit balance.`;
@@ -31070,24 +31075,24 @@ Cost: ${cents}\xA2 per call, charged to your organization's credit balance.`;
     })
   );
   server.registerTool(
-    "inspect_product",
+    "get_agent_brief",
     {
-      description: withPrice("inspect_product", "Full product detail: manifest, capabilities, offers, licenses, trust passport, versions, relationships."),
+      description: withPrice("get_agent_brief", "Get the structured integration brief for a product: capabilities, requirements, credentials, licensing (open-core splits + copyleft obligations), and cautions. The machine-readable AGENTS.md \u2014 use it to decide whether to adopt instead of rebuild, and to tell the user what it does NOT cover. Works without an API key."),
       inputSchema: { product: external_exports.string() }
     },
-    wrap("inspect_product", ({ product }) => api("GET", `/products/${encodeURIComponent(product)}`))
+    wrap("get_agent_brief", ({ product }) => api("GET", `/products/${encodeURIComponent(product)}/agent-brief`))
   );
   let commerceRegistered = false;
   function registerPostDiscoveryTools() {
     if (commerceRegistered) return;
     commerceRegistered = true;
     server.registerTool(
-      "get_agent_brief",
+      "inspect_product",
       {
-        description: withPrice("get_agent_brief", "Get the structured integration brief for a product: capabilities, requirements, credentials, licensing (open-core splits + copyleft obligations), and cautions. The machine-readable AGENTS.md \u2014 use it to decide whether to adopt instead of rebuild, and to tell the user what it does NOT cover."),
+        description: withPrice("inspect_product", "Full product detail: manifest, capabilities, offers, licenses, trust passport, versions, relationships. REQUIRES AN API KEY \u2014 for keyless discovery use get_agent_brief, which is public and carries the adopt-or-rebuild information."),
         inputSchema: { product: external_exports.string() }
       },
-      wrap("get_agent_brief", ({ product }) => api("GET", `/products/${encodeURIComponent(product)}/agent-brief`))
+      wrap("inspect_product", ({ product }) => api("GET", `/products/${encodeURIComponent(product)}`))
     );
     server.registerTool(
       "compare_products",

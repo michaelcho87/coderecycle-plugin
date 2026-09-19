@@ -38,6 +38,42 @@ const BUILD_RE =
   /\b(build|create|scaffold|set ?up|make|develop|spin up|start|implement|write)\b[\s\S]{0,80}\b(app|application|dashboard|portal|crm|saas|website|platform|api|tool|system|console|tracker|workflow|automation|agent|bot|marketplace|wiki|knowledge base|pipeline|parser|resolver|scheduler|component|ui)\b/i;
 const NEGATIVE_RE = /\b(fix|debug|refactor|rename|test|deploy|commit|review|explain|why|error)\b/i;
 
+/*
+  THE SECOND TRIGGER: A SYMPTOM, NOT A PROJECT.
+
+  BUILD_RE catches "build me a CRM". It cannot catch "my numbers turn into zeros" — no build
+  verb, no noun from its list — and NEGATIVE_RE would have suppressed it anyway. So the hook
+  was silent for the exact sentence the site prints on its own front door as the primary
+  example, for a catalogue whose stated thesis is one class of bug: the plausible wrong answer
+  that raises no error.
+
+  This pattern is deliberately NARROW. It matches a described SYMPTOM — something changed,
+  vanished, leaked, or silently succeeded — not the general vocabulary of debugging. "fix this
+  typo" and "why is this test failing" still fall through, because the catalogue has nothing
+  for them and a hook that fires on every bug is the advertisement this file exists to avoid.
+
+  The silence discipline below is unchanged and applies equally: a match still has to survive
+  the price, attempts and billing thresholds before a word is printed.
+*/
+const SYMPTOM_RE = new RegExp(
+  [
+    // a value silently became something else. `zeros?` not `zero` — the front door's own
+    // example is "my numbers turn into zeroS", and \bzero\b does not match it.
+    /\b(turn(s|ed|ing)? into|becom(e|es|ing)|show(s|ing)? up as|render(s|ed)? as|pars(e|es|ed) as)\b[\s\S]{0,40}\b(zeros?|0|null|nan|undefined|empty|blank|nothing)\b/,
+    // silently wrong, no error
+    /\b(no error|without (an )?error|nothing (throws?|logs?|says|reported)|silently|quietly)\b/,
+    // it claimed success and did nothing
+    /\b(said it worked|reported success|succeed(s|ed)? but|says? (it )?(is )?(done|complete)) \b[\s\S]{0,40}\b(empty|missing|nothing|not there|no rows?)\b/,
+    // cross-tenant / wrong-user exposure
+    /\b(another|other|someone else'?s?|different) (customer|tenant|user|account|client|org)('|')?s?\b[\s\S]{0,30}\b(data|rows?|records?|see|seeing)\b/,
+    // duplicates and drops
+    /\b(duplicate|twice|two accounts|double(-| )charg|dropped|lost) \b[\s\S]{0,30}\b(rows?|records?|users?|charges?|jobs?|messages?)\b/,
+    // a scheduled thing stopped without saying so
+    /\b(stopped (firing|running)|never (ran|fired|triggered)|missed (run|schedule))\b/,
+  ].map((r) => `(?:${r.source})`).join("|"),
+  "i",
+);
+
 const DEFAULTS = {
   enabled: true,
   maxPriceCents: 10_000,
@@ -85,7 +121,14 @@ try {
   process.exit(0);
 }
 
-if (!BUILD_RE.test(prompt) || (NEGATIVE_RE.test(prompt) && !/\bbuild\b/i.test(prompt))) process.exit(0);
+/*
+  Either door. A BUILD prompt still has to clear NEGATIVE_RE as before; a SYMPTOM prompt is
+  judged on its own pattern, because "why do my numbers turn into zeros" contains "why" and
+  would otherwise be suppressed by the very word that makes it a question worth answering.
+*/
+const looksLikeBuild = BUILD_RE.test(prompt) && !(NEGATIVE_RE.test(prompt) && !/\bbuild\b/i.test(prompt));
+const looksLikeSymptom = SYMPTOM_RE.test(prompt);
+if (!looksLikeBuild && !looksLikeSymptom) process.exit(0);
 if (prompt.length < 20 || prompt.length > 4000) process.exit(0);
 
 const base = (process.env.AMOS_BASE_URL ?? "https://coderecycle.ai/api/v1").replace(/\/$/, "");
